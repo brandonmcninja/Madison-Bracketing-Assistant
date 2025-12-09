@@ -1,0 +1,5 @@
+{
+  "name": "The Madison Automator",
+  "description": "Automated Jiu-Jitsu tournament bracketing using Madison grouping logic with AI-powered outlier analysis.",
+  "requestFramePermissions": []
+}
