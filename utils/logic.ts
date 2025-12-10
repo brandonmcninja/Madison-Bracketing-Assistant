@@ -15,20 +15,20 @@ const BELT_RANK: Record<Belt, number> = {
   [Belt.BLACK]: 9
 };
 
-// Updated Order: Youngest to Oldest as requested
+// Updated Order: Youngest to Oldest as requested, with Roman Numerals for Masters
 const DIVISION_RANK_ORDER = [
   "8U Coed",
   "9-12 Coed",
   "13-15 Male",
   "13-15 Female",
-  "Adult 16+ Male",
-  "Adult 16+ Female",
-  "Masters 35+ Male",
-  "Masters 35+ Female",
-  "Masters 40+ Male",
-  "Masters 40+ Female",
-  "Masters 45+ Male",
-  "Masters 45+ Female"
+  "Adult (16+) Male",
+  "Adult (16+) Female",
+  "Masters I (35+) Male",
+  "Masters I (35+) Female",
+  "Masters II (40+) Male",
+  "Masters II (40+) Female",
+  "Masters III (45+) Male",
+  "Masters III (45+) Female"
 ];
 
 const getDivisionRank = (divName: string): number => {
@@ -42,11 +42,11 @@ const getDivisionKey = (c: Competitor): string => {
   if (c.age <= 12) return "9-12 Coed";
   if (c.age <= 15) return `13-15 ${c.gender}`;
   
-  if (c.age >= 45) return `Masters 45+ ${c.gender}`;
-  if (c.age >= 40) return `Masters 40+ ${c.gender}`;
-  if (c.age >= 35) return `Masters 35+ ${c.gender}`;
+  if (c.age >= 45) return `Masters III (45+) ${c.gender}`;
+  if (c.age >= 40) return `Masters II (40+) ${c.gender}`;
+  if (c.age >= 35) return `Masters I (35+) ${c.gender}`;
   
-  return `Adult 16+ ${c.gender}`;
+  return `Adult (16+) ${c.gender}`;
 };
 
 // Helper to check validity of a specific group

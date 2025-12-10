@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Competitor, Discipline } from '../types';
-import { AlertCircle, Bot, Loader2, GripVertical, Phone, AlertTriangle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Competitor, Discipline, Belt } from '../types';
+import { Bot, Loader2, GripVertical, Phone, AlertTriangle } from 'lucide-react';
 import { analyzeOutliers } from '../services/geminiService';
 
 interface OutlierListProps {
@@ -9,6 +9,18 @@ interface OutlierListProps {
   setDraggedCompetitor: (c: Competitor | null) => void;
   onSelectCompetitor: (competitorId: string) => void;
 }
+
+const BELT_ORDER: Record<Belt, number> = {
+  [Belt.WHITE]: 1, [Belt.BEGINNER]: 1,
+  [Belt.GREY]: 2,
+  [Belt.YELLOW]: 3,
+  [Belt.ORANGE]: 4,
+  [Belt.GREEN]: 5,
+  [Belt.BLUE]: 6, [Belt.INTERMEDIATE]: 6,
+  [Belt.PURPLE]: 7, [Belt.ADVANCED]: 7,
+  [Belt.BROWN]: 8, [Belt.EXPERT]: 8,
+  [Belt.BLACK]: 9
+};
 
 export const OutlierList: React.FC<OutlierListProps> = ({ 
     outliers, 
@@ -19,6 +31,29 @@ export const OutlierList: React.FC<OutlierListProps> = ({
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Sort outliers: Missing Data -> Belt -> Weight -> Age
+  const sortedOutliers = useMemo(() => {
+    return [...outliers].sort((a, b) => {
+      // 1. Priority: Missing Data (Weight 0 or Age 0)
+      const aMissing = a.weight === 0 || a.age === 0;
+      const bMissing = b.weight === 0 || b.age === 0;
+      
+      if (aMissing && !bMissing) return -1;
+      if (!aMissing && bMissing) return 1;
+
+      // 2. Rank: Belt (Lower belts first)
+      const rankA = BELT_ORDER[a.belt] || 99;
+      const rankB = BELT_ORDER[b.belt] || 99;
+      if (rankA !== rankB) return rankA - rankB;
+
+      // 3. Weight: Lightest first
+      if (a.weight !== b.weight) return a.weight - b.weight;
+
+      // 4. Age: Youngest first
+      return a.age - b.age;
+    });
+  }, [outliers]);
 
   const handleAnalyze = async () => {
     setLoading(true);
@@ -35,7 +70,7 @@ export const OutlierList: React.FC<OutlierListProps> = ({
   const handleDragStart = (e: React.DragEvent, competitor: Competitor) => {
     setDraggedCompetitor(competitor);
     e.dataTransfer.setData("text/plain", competitor.id);
-    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.effectAllowed = e.altKey ? "copy" : "move";
   };
 
   const handleDragEnd = () => {
@@ -98,7 +133,7 @@ export const OutlierList: React.FC<OutlierListProps> = ({
            </div>
         ) : (
             <div className="space-y-2">
-                {outliers.map((c) => {
+                {sortedOutliers.map((c) => {
                   const isGi = c.discipline === Discipline.GI;
                   const isMissingData = c.weight === 0 || c.age === 0;
                   

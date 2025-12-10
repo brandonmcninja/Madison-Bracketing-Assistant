@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Bracket, Competitor, Gender, Discipline } from '../types';
-import { User, Weight, Calendar, AlertTriangle, ChevronRight, PlusCircle } from 'lucide-react';
+import { User, Weight, Calendar, AlertTriangle, ChevronRight, PlusCircle, Users } from 'lucide-react';
 import { ADULT_AGE_THRESHOLD } from '../utils/logic';
 
 interface BracketDisplayProps {
@@ -10,6 +10,7 @@ interface BracketDisplayProps {
   draggedCompetitor: Competitor | null;
   setDraggedCompetitor: (c: Competitor | null) => void;
   onSelectCompetitor: (competitorId: string) => void;
+  onCreateEmpty: () => void;
 }
 
 export const BracketDisplay: React.FC<BracketDisplayProps> = ({ 
@@ -18,7 +19,8 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
   onSelectBracket,
   draggedCompetitor,
   setDraggedCompetitor,
-  onSelectCompetitor
+  onSelectCompetitor,
+  onCreateEmpty
 }) => {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
@@ -85,6 +87,12 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
       <div className="flex flex-col items-center justify-center h-64 text-slate-400">
         <User size={48} className="mb-4 opacity-50" />
         <p>No valid brackets generated yet.</p>
+        <button 
+            onClick={onCreateEmpty}
+            className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+        >
+            <Users size={16} /> Create Empty Group
+        </button>
       </div>
     );
   }
@@ -183,15 +191,20 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
         onDragOver={handleDragOverNew}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, 'new-bracket')}
-        className={`min-h-[200px] rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-6 text-center transition-all ${
+        className={`min-h-[200px] rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-6 text-center transition-all cursor-pointer ${
             dragOverId === 'new-bracket'
                 ? 'border-blue-500 bg-blue-50 text-blue-600 scale-[1.02]'
-                : 'border-slate-300 text-slate-400 hover:border-slate-400 hover:bg-slate-50'
+                : 'border-slate-300 text-slate-400 hover:border-blue-400 hover:text-blue-500 hover:bg-slate-50'
         }`}
+        onClick={onCreateEmpty}
       >
-          <PlusCircle size={32} className="mb-2 opacity-50" />
+          <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3 border border-current">
+             <PlusCircle size={24} />
+          </div>
           <h3 className="font-bold text-sm">Create New Bracket</h3>
-          <p className="text-xs mt-1 opacity-70">Drag an athlete here to start a new group</p>
+          <p className="text-xs mt-1 opacity-70 max-w-[150px]">
+            Drag an athlete here or click to start a new empty group.
+          </p>
       </div>
     </div>
   );
