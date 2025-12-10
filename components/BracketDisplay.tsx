@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Bracket, Competitor, Gender } from '../types';
-import { User, Weight, Calendar, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Bracket, Competitor, Gender, Discipline } from '../types';
+import { User, Weight, Calendar, AlertTriangle, ChevronRight, PlusCircle } from 'lucide-react';
 import { ADULT_AGE_THRESHOLD } from '../utils/logic';
 
 interface BracketDisplayProps {
@@ -9,6 +9,7 @@ interface BracketDisplayProps {
   onSelectBracket: (bracketId: string) => void;
   draggedCompetitor: Competitor | null;
   setDraggedCompetitor: (c: Competitor | null) => void;
+  onSelectCompetitor: (competitorId: string) => void;
 }
 
 export const BracketDisplay: React.FC<BracketDisplayProps> = ({ 
@@ -16,46 +17,41 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
   onMoveCompetitor,
   onSelectBracket,
   draggedCompetitor,
-  setDraggedCompetitor
+  setDraggedCompetitor,
+  onSelectCompetitor
 }) => {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  // Validation logic to check if drag drop is allowed
   const isDropValid = (bracket: Bracket, competitor: Competitor): boolean => {
-    // 1. Determine Bracket Type
-    let bracketGender: Gender;
-    let isBracketAdult: boolean;
-
-    if (bracket.competitors.length > 0) {
-        bracketGender = bracket.competitors[0].gender;
-        isBracketAdult = bracket.competitors[0].age >= ADULT_AGE_THRESHOLD;
-    } else {
-        // Fallback parsing if bracket is empty
-        bracketGender = bracket.name.includes('Female') ? Gender.FEMALE : Gender.MALE;
-        isBracketAdult = bracket.name.includes('(Adult)');
+    if (competitor.discipline !== bracket.discipline) return false;
+    
+    // Logic update: Allow 13+ to bump up to Adult brackets
+    const isAdultBracket = bracket.division.includes('Adult') || bracket.division.includes('Masters');
+    
+    if (isAdultBracket) {
+        // Prevent very young kids (under 13) from fighting adults, but allow 13+
+        if (competitor.age < 13) return false;
+    } 
+    
+    // Gender strictness
+    if (bracket.division.includes('Male') || bracket.division.includes('Female')) {
+        const bracketGender = bracket.division.includes('Female') ? Gender.FEMALE : Gender.MALE;
+        if (competitor.gender !== bracketGender) return false;
     }
-
-    const isCompetitorAdult = competitor.age >= ADULT_AGE_THRESHOLD;
-
-    // Check Gender
-    if (competitor.gender !== bracketGender) return false;
-
-    // Check Age Category (Kid vs Adult)
-    if (competitor.age < ADULT_AGE_THRESHOLD && isBracketAdult) return false;
-    if (competitor.age >= ADULT_AGE_THRESHOLD && !isBracketAdult) return false;
-
     return true;
   };
 
   const handleDragOver = (e: React.DragEvent, bracket: Bracket) => {
-    // If we know who is dragging, check validity
     if (draggedCompetitor && !isDropValid(bracket, draggedCompetitor)) {
-        // Do NOT call preventDefault(), effectively disabling the drop
         return; 
     }
-
-    e.preventDefault(); // Allows dropping
+    e.preventDefault();
     setDragOverId(bracket.id);
+  };
+
+  const handleDragOverNew = (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOverId('new-bracket');
   };
 
   const handleDragLeave = () => {
@@ -72,7 +68,7 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
   };
 
   const handleDragStart = (e: React.DragEvent, competitor: Competitor) => {
-    e.stopPropagation(); // Stop click from firing on card
+    e.stopPropagation();
     setDraggedCompetitor(competitor);
     e.dataTransfer.setData("text/plain", competitor.id);
     e.dataTransfer.effectAllowed = "move";
@@ -83,7 +79,8 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
       setDragOverId(null);
   };
 
-  if (brackets.length === 0) {
+  // If no brackets and no dragging, show empty state
+  if (brackets.length === 0 && !draggedCompetitor) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-slate-400">
         <User size={48} className="mb-4 opacity-50" />
@@ -95,9 +92,9 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-6 pb-20">
       {brackets.map((bracket) => {
-        // Validation Warnings
-        const isWeightWarning = bracket.maxWeightDiffPerc > 20; // Hardcoded visual warning threshold
+        const isWeightWarning = bracket.maxWeightDiffPerc > 20;
         const isAgeWarning = bracket.maxAgeGap > 10;
+        const isGi = bracket.discipline === Discipline.GI;
         
         return (
           <div 
@@ -112,10 +109,19 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
                 : 'border-slate-200'
             }`}
           >
-            <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center group-hover:bg-blue-50/30 transition-colors">
-              <h3 className="font-semibold text-slate-700 text-sm truncate max-w-[70%]" title={bracket.name}>{bracket.name}</h3>
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                {bracket.competitors.length} Fighters
+            <div className={`px-4 py-3 border-b flex justify-between items-center transition-colors ${
+                isGi ? 'bg-blue-50/50 border-blue-100' : 'bg-slate-100 border-slate-200'
+            }`}>
+              <div className="flex items-center gap-2 overflow-hidden">
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                      isGi ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-800 text-white border-slate-800'
+                  }`}>
+                      {isGi ? 'GI' : 'NO GI'}
+                  </span>
+                  <h3 className="font-semibold text-slate-800 text-sm truncate" title={bracket.name}>{bracket.name}</h3>
+              </div>
+              <span className="text-xs bg-white/50 text-slate-600 px-2 py-1 rounded-full font-medium border border-slate-200/50">
+                {bracket.competitors.length}
               </span>
             </div>
             
@@ -135,28 +141,25 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
                       draggable
                       onDragStart={(e) => handleDragStart(e, c)}
                       onDragEnd={handleDragEnd}
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectCompetitor(c.id);
+                      }}
                       className="group/row cursor-grab active:cursor-grabbing hover:bg-slate-50 transition-colors relative"
                     >
                       <td className="py-2 pr-2">
                         <div className="font-medium text-slate-800">{c.name}</div>
-                        <div className="text-xs text-slate-500 truncate">{c.academy} - {c.belt}</div>
+                        <div className="text-xs text-slate-500 truncate">{c.academy}</div>
                       </td>
                       <td className="py-2 text-right text-slate-600">{c.age}</td>
                       <td className="py-2 text-right font-mono text-slate-700">{c.weight}</td>
                     </tr>
                   ))}
-                  {bracket.competitors.length === 0 && (
-                     <tr>
-                         <td colSpan={3} className="py-8 text-center text-xs text-slate-400 italic dashed border-2 border-slate-100 rounded m-2">
-                             Drag competitors here
-                         </td>
-                     </tr>
-                  )}
                 </tbody>
               </table>
             </div>
 
-            <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex justify-between text-xs text-slate-500 rounded-b-xl group-hover:bg-blue-50/30 transition-colors">
+            <div className="px-4 py-3 bg-slate-50/50 border-t border-slate-100 flex justify-between text-xs text-slate-500 rounded-b-xl">
               <div className="flex gap-4">
                   <div className={`flex items-center gap-1 ${isWeightWarning ? 'text-orange-600 font-bold' : ''}`}>
                     {isWeightWarning ? <AlertTriangle size={12} /> : <Weight size={12} />}
@@ -174,6 +177,22 @@ export const BracketDisplay: React.FC<BracketDisplayProps> = ({
           </div>
         );
       })}
+
+      {/* Create New Bracket Zone */}
+      <div 
+        onDragOver={handleDragOverNew}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, 'new-bracket')}
+        className={`min-h-[200px] rounded-xl border-2 border-dashed flex flex-col items-center justify-center p-6 text-center transition-all ${
+            dragOverId === 'new-bracket'
+                ? 'border-blue-500 bg-blue-50 text-blue-600 scale-[1.02]'
+                : 'border-slate-300 text-slate-400 hover:border-slate-400 hover:bg-slate-50'
+        }`}
+      >
+          <PlusCircle size={32} className="mb-2 opacity-50" />
+          <h3 className="font-bold text-sm">Create New Bracket</h3>
+          <p className="text-xs mt-1 opacity-70">Drag an athlete here to start a new group</p>
+      </div>
     </div>
   );
 };

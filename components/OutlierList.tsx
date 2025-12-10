@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import { Competitor } from '../types';
-import { AlertCircle, Bot, Loader2, GripVertical } from 'lucide-react';
+import { Competitor, Discipline } from '../types';
+import { AlertCircle, Bot, Loader2, GripVertical, Phone } from 'lucide-react';
 import { analyzeOutliers } from '../services/geminiService';
 
 interface OutlierListProps {
   outliers: Competitor[];
   onMoveCompetitor: (competitorId: string, targetBracketId: string | null) => void;
   setDraggedCompetitor: (c: Competitor | null) => void;
+  onSelectCompetitor: (competitorId: string) => void;
 }
 
 export const OutlierList: React.FC<OutlierListProps> = ({ 
     outliers, 
     onMoveCompetitor,
-    setDraggedCompetitor 
+    setDraggedCompetitor,
+    onSelectCompetitor
 }) => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -96,29 +98,45 @@ export const OutlierList: React.FC<OutlierListProps> = ({
            </div>
         ) : (
             <div className="space-y-2">
-                {outliers.map((c) => (
+                {outliers.map((c) => {
+                  const isGi = c.discipline === Discipline.GI;
+                  return (
                   <div 
                     key={c.id} 
                     draggable
                     onDragStart={(e) => handleDragStart(e, c)}
                     onDragEnd={handleDragEnd}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectCompetitor(c.id);
+                    }}
                     className="bg-white p-3 rounded shadow-sm border border-slate-200 cursor-grab active:cursor-grabbing hover:border-blue-400 transition-colors group relative"
                   >
                     <div className="flex justify-between items-start">
                         <div>
                             <div className="font-medium text-sm text-slate-900">{c.name}</div>
-                            <div className="text-xs text-slate-500">{c.academy}</div>
+                            <div className="text-xs text-slate-500 truncate max-w-[150px]">{c.academy}</div>
                         </div>
                         <GripVertical size={16} className="text-slate-300 group-hover:text-slate-500" />
                     </div>
-                    <div className="mt-2 flex gap-2 flex-wrap">
+                    <div className="mt-2 flex gap-2 flex-wrap items-center">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                            isGi ? 'bg-blue-100 text-blue-700' : 'bg-slate-800 text-white'
+                        }`}>
+                            {isGi ? 'GI' : 'NO GI'}
+                        </span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">{c.belt}</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">{c.gender}</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">{c.weight} lbs</span>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">{c.age} yo</span>
                     </div>
+                    {c.phone && (
+                        <div className="mt-1.5 flex items-center gap-1 text-[10px] text-slate-400">
+                            <Phone size={10} /> {c.phone}
+                        </div>
+                    )}
                   </div>
-                ))}
+                )})}
             </div>
         )}
       </div>

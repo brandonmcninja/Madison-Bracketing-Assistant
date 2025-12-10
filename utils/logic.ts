@@ -1,24 +1,90 @@
-import { Competitor, AppSettings, ProcessingResult, Bracket, Belt } from '../types';
+import { Competitor, AppSettings, ProcessingResult, Bracket, Belt, Discipline, Gender } from '../types';
 
-export const ADULT_AGE_THRESHOLD = 18;
+export const ADULT_AGE_THRESHOLD = 16;
+
+// Rankings for sorting
+const BELT_RANK: Record<Belt, number> = {
+  [Belt.WHITE]: 1, [Belt.BEGINNER]: 1,
+  [Belt.GREY]: 2,
+  [Belt.YELLOW]: 3,
+  [Belt.ORANGE]: 4,
+  [Belt.GREEN]: 5,
+  [Belt.BLUE]: 6, [Belt.INTERMEDIATE]: 6,
+  [Belt.PURPLE]: 7, [Belt.ADVANCED]: 7,
+  [Belt.BROWN]: 8, [Belt.EXPERT]: 8,
+  [Belt.BLACK]: 9
+};
+
+// Updated Order: Male before Female as requested
+const DIVISION_RANK_ORDER = [
+  "8U Coed",
+  "9-12 Coed",
+  "13-15 Male",
+  "13-15 Female",
+  "Adult 16+ Male",
+  "Adult 16+ Female",
+  "Masters 35+ Male",
+  "Masters 35+ Female",
+  "Masters 40+ Male",
+  "Masters 40+ Female",
+  "Masters 45+ Male",
+  "Masters 45+ Female"
+];
+
+const getDivisionRank = (divName: string): number => {
+  const index = DIVISION_RANK_ORDER.indexOf(divName);
+  return index === -1 ? 99 : index; // Unknown divisions go last
+};
+
+// Helper to determine the precise division based on requirements
+const getDivisionKey = (c: Competitor): string => {
+  if (c.age <= 8) return "8U Coed";
+  if (c.age <= 12) return "9-12 Coed";
+  if (c.age <= 15) return `13-15 ${c.gender}`;
+  
+  if (c.age >= 45) return `Masters 45+ ${c.gender}`;
+  if (c.age >= 40) return `Masters 40+ ${c.gender}`;
+  if (c.age >= 35) return `Masters 35+ ${c.gender}`;
+  
+  return `Adult 16+ ${c.gender}`;
+};
 
 // Helper to check validity of a specific group
-const isValidGroup = (group: Competitor[], maxWeightDiff: number, maxAgeGap: number): boolean => {
+const isValidGroup = (group: Competitor[], settings: AppSettings, isAdult: boolean): boolean => {
   if (group.length < 2) return false;
   
-  const minWeight = group[0].weight;
-  const maxWeight = group[group.length - 1].weight;
-  const weightDiff = ((maxWeight - minWeight) / minWeight) * 100;
+  const sorted = [...group].sort((a,b) => a.weight - b.weight);
+  const minWeight = sorted[0].weight;
+  const maxWeight = sorted[sorted.length - 1].weight;
   
+  // Ultra Heavy Logic: If smallest person is > 225 and setting is on, ignore weight diff
+  if (settings.ultraHeavyIgnore && minWeight >= 225) {
+      // Pass weight check automatically
+  } else {
+      const weightDiffPerc = ((maxWeight - minWeight) / minWeight) * 100;
+      const weightDiffLbs = maxWeight - minWeight;
+      
+      const maxPerc = isAdult ? settings.adultsMaxWeightDiffPercent : settings.kidsMaxWeightDiffPercent;
+      
+      // Validity: Must satisfy Percentage Rule AND Absolute Cap Rule
+      // e.g. 10% allowed, but never more than 13lbs.
+      if (weightDiffPerc > maxPerc) return false;
+      if (weightDiffLbs > settings.maxWeightDiffLbs) return false;
+  }
+  
+  // Age Logic
   const ages = group.map(c => c.age);
   const minAge = Math.min(...ages);
   const maxAge = Math.max(...ages);
   const ageGap = maxAge - minAge;
 
-  return weightDiff <= maxWeightDiff && ageGap <= maxAgeGap;
+  const maxAgeGap = isAdult 
+    ? (settings.adultsIgnoreAgeGap ? 100 : 15)
+    : 5; // Default safe gap within bucket
+
+  return ageGap <= maxAgeGap;
 };
 
-// Exported helper to recalculate stats for a bracket after manual modification
 export const recalculateBracketStats = (bracket: Bracket): Bracket => {
   if (bracket.competitors.length === 0) {
     return {
@@ -32,7 +98,6 @@ export const recalculateBracketStats = (bracket: Bracket): Bracket => {
   const sorted = [...bracket.competitors].sort((a, b) => a.weight - b.weight);
   const minWeight = sorted[0].weight;
   const maxWeight = sorted[sorted.length - 1].weight;
-  
   const ages = bracket.competitors.map(c => c.age);
   
   return {
@@ -44,10 +109,16 @@ export const recalculateBracketStats = (bracket: Bracket): Bracket => {
   };
 };
 
-// Generic bracket finder for a specific pool of people
+// Convert number index to Letter (0 -> A, 1 -> B)
+const getGroupLetter = (index: number): string => {
+    return String.fromCharCode(65 + index); // 65 is 'A'
+};
+
 const createBracketsFromPool = (
   pool: Competitor[], 
-  baseName: string, 
+  discipline: Discipline,
+  divisionName: string,
+  beltName: string,
   settings: AppSettings, 
   isAdult: boolean,
   startId: number
@@ -56,133 +127,126 @@ const createBracketsFromPool = (
   const brackets: Bracket[] = [];
   const outliers: Competitor[] = [];
   
-  // Sort by weight
   pool.sort((a, b) => a.weight - b.weight);
 
-  const maxWeightDiff = isAdult ? settings.adultsMaxWeightDiffPercent : settings.kidsMaxWeightDiffPercent;
-  // If adults ignore age gap, we use a very high number (e.g. 100 years)
-  const maxAgeGap = isAdult 
-    ? (settings.adultsIgnoreAgeGap ? 100 : 15) // Default to 15y if not ignored, but usually ignored
-    : settings.kidsMaxAgeGap;
+  // Strategy: Prioritize groups of 5, then 4, then 3. Strict max 5.
+  let sizesToTry = [5, 4, 3];
+  // If target is 3, try 3 first.
+  if (settings.targetBracketSize === 3) sizesToTry = [3, 4, 5];
+  // If target is 4, try 4, 5, 3
+  if (settings.targetBracketSize === 4) sizesToTry = [4, 5, 3];
 
   let i = 0;
   while (i < pool.length) {
     const remaining = pool.length - i;
-    
-    // Size preference logic
-    let sizesToTry: number[] = [];
-    if (settings.targetBracketSize === 4) sizesToTry = [4, 5, 3];
-    else if (settings.targetBracketSize === 3) sizesToTry = [3, 4, 5];
-    else sizesToTry = [5, 4, 3];
-
     let bestMatch: Competitor[] | null = null;
 
-    // Greedy search
     for (const size of sizesToTry) {
       if (remaining < size) continue;
       
       const candidateGroup = pool.slice(i, i + size);
-      if (isValidGroup(candidateGroup, maxWeightDiff, maxAgeGap)) {
+      if (isValidGroup(candidateGroup, settings, isAdult)) {
         bestMatch = candidateGroup;
         break;
       }
     }
 
     if (bestMatch) {
-      brackets.push({
-        id: `bracket-${baseName.replace(/\s+/g, '-')}-${startId + brackets.length}`,
-        name: `${baseName} (Group ${brackets.length + 1})`,
+      const letter = getGroupLetter(brackets.length);
+      const b: Bracket = {
+        id: `bracket-${discipline}-${divisionName}-${beltName}-${startId + brackets.length}`.replace(/[^a-zA-Z0-9-]/g, '-'),
+        name: `${divisionName} - ${beltName} (Group ${letter})`,
+        discipline,
+        division: divisionName,
         competitors: bestMatch,
         avgWeight: bestMatch.reduce((sum, c) => sum + c.weight, 0) / bestMatch.length,
         maxWeightDiffPerc: ((bestMatch[bestMatch.length-1].weight - bestMatch[0].weight) / bestMatch[0].weight) * 100,
         maxAgeGap: Math.max(...bestMatch.map(c=>c.age)) - Math.min(...bestMatch.map(c=>c.age))
-      });
+      };
+      brackets.push(b);
       i += bestMatch.length;
     } else {
-      // Straggler Handling
-      if (remaining < 3) {
-         // Try to merge into previous bracket
-         const lastBracket = brackets.length > 0 ? brackets[brackets.length - 1] : null;
-         let merged = false;
-
-         if (lastBracket) {
-           const combinedGroup = [...lastBracket.competitors, ...pool.slice(i)];
-           if (isValidGroup(combinedGroup, maxWeightDiff, maxAgeGap)) {
-             lastBracket.competitors = combinedGroup;
-             // Re-calc stats
-             lastBracket.maxWeightDiffPerc = ((combinedGroup[combinedGroup.length-1].weight - combinedGroup[0].weight) / combinedGroup[0].weight) * 100;
-             lastBracket.maxAgeGap = Math.max(...combinedGroup.map(c=>c.age)) - Math.min(...combinedGroup.map(c=>c.age));
-             lastBracket.avgWeight = combinedGroup.reduce((sum, c) => sum + c.weight, 0) / combinedGroup.length;
-             merged = true;
-           }
-         }
-
-         if (!merged) {
-           for (let j = i; j < pool.length; j++) outliers.push(pool[j]);
-         }
-         break;
-      } else {
-        outliers.push(pool[i]);
-        i += 1;
-      }
+      // Stragglers logic
+      outliers.push(pool[i]);
+      i += 1;
     }
   }
 
   return { brackets, outliers };
 };
 
+const sortBrackets = (brackets: Bracket[]): Bracket[] => {
+    return brackets.sort((a, b) => {
+        // 1. Discipline (Gi first)
+        if (a.discipline !== b.discipline) {
+            return a.discipline === Discipline.GI ? -1 : 1;
+        }
+        
+        // 2. Belt (White -> Black)
+        const beltA = a.competitors[0]?.belt || Belt.WHITE;
+        const beltB = b.competitors[0]?.belt || Belt.WHITE;
+        if (BELT_RANK[beltA] !== BELT_RANK[beltB]) {
+            return BELT_RANK[beltA] - BELT_RANK[beltB];
+        }
+
+        // 3. Division (Age Groups)
+        const rankA = getDivisionRank(a.division);
+        const rankB = getDivisionRank(b.division);
+        if (rankA !== rankB) return rankA - rankB;
+
+        // 4. Name (Group A, Group B)
+        return a.name.localeCompare(b.name);
+    });
+};
+
 export const processCompetitors = (competitors: Competitor[], settings: AppSettings): ProcessingResult => {
   let allBrackets: Bracket[] = [];
   let allOutliers: Competitor[] = [];
 
-  // 1. Split Kids and Adults
-  const kids = competitors.filter(c => c.age < ADULT_AGE_THRESHOLD);
-  const adults = competitors.filter(c => c.age >= ADULT_AGE_THRESHOLD);
+  // Grouping Key: Discipline + Division + Belt
+  const pools = new Map<string, Competitor[]>();
 
-  // --- PROCESS KIDS ---
-  // Group Strictly by Gender + Belt
-  const kidPools = new Map<string, Competitor[]>();
-  kids.forEach(c => {
-    const key = `${c.gender} ${c.belt} (Kids)`;
-    if (!kidPools.has(key)) kidPools.set(key, []);
-    kidPools.get(key)?.push(c);
-  });
+  competitors.forEach(c => {
+    // Treat 0 weight OR 0 age as immediate outlier
+    if (c.weight === 0 || c.age === 0) {
+        allOutliers.push(c);
+        return;
+    }
 
-  kidPools.forEach((pool, name) => {
-    const { brackets, outliers } = createBracketsFromPool(pool, name, settings, false, allBrackets.length);
-    allBrackets = [...allBrackets, ...brackets];
-    allOutliers = [...allOutliers, ...outliers];
-  });
-
-  // --- PROCESS ADULTS ---
-  // Group by Gender + (Belt Logic)
-  const adultPools = new Map<string, Competitor[]>();
-  
-  adults.forEach(c => {
-    let beltKey = c.belt as string;
+    const division = getDivisionKey(c);
+    const beltKey = c.belt as string;
+    const isAdultDivision = division.includes('Adult') || division.includes('Masters');
     
-    // Belt Merging Logic
-    if (settings.adultsCombineBrownBlack) {
-      if (c.belt === Belt.BROWN || c.belt === Belt.BLACK) {
-        beltKey = "Brown/Black";
-      }
-    }
-    if (settings.adultsCombineWhiteBlue) {
-        if (c.belt === Belt.WHITE || c.belt === Belt.BLUE) {
-            beltKey = "White/Blue";
-        }
-    }
+    // We strictly bucket by these keys for the auto-generator
+    const key = JSON.stringify({
+        discipline: c.discipline,
+        division: division,
+        belt: beltKey,
+        isAdult: isAdultDivision
+    });
 
-    const key = `${c.gender} ${beltKey} (Adult)`;
-    if (!adultPools.has(key)) adultPools.set(key, []);
-    adultPools.get(key)?.push(c);
+    if (!pools.has(key)) pools.set(key, []);
+    pools.get(key)?.push(c);
   });
 
-  adultPools.forEach((pool, name) => {
-    const { brackets, outliers } = createBracketsFromPool(pool, name, settings, true, allBrackets.length);
-    allBrackets = [...allBrackets, ...brackets];
-    allOutliers = [...allOutliers, ...outliers];
+  // Process each pool
+  pools.forEach((pool, keyString) => {
+      const keyInfo = JSON.parse(keyString);
+      const { brackets, outliers } = createBracketsFromPool(
+          pool, 
+          keyInfo.discipline, 
+          keyInfo.division, 
+          keyInfo.belt, 
+          settings, 
+          keyInfo.isAdult, 
+          allBrackets.length
+      );
+      allBrackets = [...allBrackets, ...brackets];
+      allOutliers = [...allOutliers, ...outliers];
   });
 
-  return { validBrackets: allBrackets, outliers: allOutliers };
+  return { 
+      validBrackets: sortBrackets(allBrackets), 
+      outliers: allOutliers 
+  };
 };

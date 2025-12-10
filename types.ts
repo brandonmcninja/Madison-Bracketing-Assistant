@@ -3,6 +3,11 @@ export enum Gender {
   FEMALE = 'Female'
 }
 
+export enum Discipline {
+  GI = 'Gi',
+  NOGI = 'No Gi'
+}
+
 export enum Belt {
   WHITE = 'White',
   GREY = 'Grey',
@@ -12,7 +17,12 @@ export enum Belt {
   BLUE = 'Blue',
   PURPLE = 'Purple',
   BROWN = 'Brown',
-  BLACK = 'Black'
+  BLACK = 'Black',
+  // No Gi Ranks
+  BEGINNER = 'Beginner',
+  INTERMEDIATE = 'Intermediate',
+  ADVANCED = 'Advanced',
+  EXPERT = 'Expert'
 }
 
 export interface Competitor {
@@ -23,11 +33,17 @@ export interface Competitor {
   age: number;
   weight: number; // in lbs or kg, assuming uniform unit
   belt: Belt;
+  discipline: Discipline;
+  email?: string;
+  phone?: string;
+  notes?: string;
 }
 
 export interface Bracket {
   id: string;
-  name: string; // e.g., "Male White Belt - Light"
+  name: string; // e.g., "Gi - Male White Belt - Light"
+  discipline: Discipline;
+  division: string; // e.g. "8U Coed"
   competitors: Competitor[];
   avgWeight: number;
   maxWeightDiffPerc: number;
@@ -37,15 +53,16 @@ export interface Bracket {
 export interface AppSettings {
   targetBracketSize: number;
   
-  // Kids Rules (< 18)
+  // Kids Rules (< 16)
   kidsMaxWeightDiffPercent: number;
-  kidsMaxAgeGap: number;
-
-  // Adult Rules (18+)
+  
+  // Adult Rules (16+)
   adultsMaxWeightDiffPercent: number;
-  adultsIgnoreAgeGap: boolean; // If true, allows 18yo vs 40yo
-  adultsCombineBrownBlack: boolean; // Merge Brown and Black belts
-  adultsCombineWhiteBlue: boolean; // Merge White and Blue belts (optional)
+  adultsIgnoreAgeGap: boolean; // If true, allows 16yo vs 40yo
+  
+  // Advanced Weight Rules
+  maxWeightDiffLbs: number; // Absolute cap (e.g. 13 lbs)
+  ultraHeavyIgnore: boolean; // Ignore max weight diff if min weight > 225
 }
 
 export interface ProcessingResult {

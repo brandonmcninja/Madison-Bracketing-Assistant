@@ -18,18 +18,19 @@ export const analyzeOutliers = async (outliers: Competitor[]): Promise<string> =
   }));
 
   const prompt = `
-    You are an expert Jiu-Jitsu Tournament Director.
-    I have a list of 'Outlier' competitors who could not be placed into standard brackets based on strict Madison Bracketing rules (weight/age gaps).
+    You are an expert Jiu-Jitsu Tournament Director helping to clean up 'Outliers'.
     
     Here is the list of unmatched competitors:
     ${JSON.stringify(outlierData)}
 
-    Please analyze this list and suggest:
-    1. Potential "Super Fights" (fair matches between 2 people who might be slightly outside standard weight/age limits but safe to fight).
-    2. Suggested "Catch Weight" brackets (groups of 3 or 4) that might span belt colors (e.g., Purple/Brown mix) or age groups if safety permits.
-    3. A brief summary of why these specific people were hard to match (e.g. "mostly heavyweights" or "mostly children").
+    Please analyze this list and suggest specific matches or strategies to place them.
+    Focus on these specific strategies:
+    1. **Bumping Up Age:** Suggest moving older teens (13-15) into Adult divisions if weights align.
+    2. **Dropping Down Age:** Suggest moving Masters (35+) down to Adult (16+) if weights align.
+    3. **Bumping Up Skill:** Suggest combining belt levels (e.g. Purple vs Brown) for a "Super Fight" or mixed bracket.
+    4. **Catch Weights:** Identify 2-4 people who are safe to fight despite being outside standard brackets.
 
-    Format the output as a clean, markdown-formatted report.
+    Format the output as a clean, actionable markdown report.
   `;
 
   try {
