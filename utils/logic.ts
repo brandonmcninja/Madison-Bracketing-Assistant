@@ -15,7 +15,7 @@ const BELT_RANK: Record<Belt, number> = {
   [Belt.BLACK]: 9
 };
 
-// Updated Order: Male before Female as requested
+// Updated Order: Youngest to Oldest as requested
 const DIVISION_RANK_ORDER = [
   "8U Coed",
   "9-12 Coed",

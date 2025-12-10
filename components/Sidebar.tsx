@@ -104,7 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
              <div className="space-y-4">
                <div>
                   <div className="flex justify-between mb-1">
-                    <label className="text-xs font-medium text-slate-700">Max Weight Diff (Lbs)</label>
+                    <label className="text-xs font-medium text-slate-700">Max Weight Cap (Lbs)</label>
                     <span className="text-xs font-bold text-slate-900">{settings.maxWeightDiffLbs} lbs</span>
                   </div>
                   <input
@@ -115,7 +115,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onChange={(e) => setSettings({ ...settings, maxWeightDiffLbs: Number(e.target.value) })}
                     className="w-full h-1.5 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-slate-600"
                   />
-                  <p className="text-[10px] text-slate-500 mt-1">Cap on absolute weight difference.</p>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-tight">
+                    Hard limit. Overrides % if exceeded (e.g. 10% allowed, but max {settings.maxWeightDiffLbs}lbs).
+                  </p>
                </div>
                
                <div className="flex items-start gap-2 pt-2 border-t border-slate-200">
@@ -157,7 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 />
               </div>
               <p className="text-[10px] text-slate-500 leading-tight">
-                  Strictly bucketed into <strong>8U</strong> and <strong>9-12</strong> divisions.
+                  Strictly bucketed into <strong>8U</strong> (Coed), <strong>9-12</strong> (Coed), and <strong>13-15</strong> (Gender Separated).
               </p>
             </div>
           </section>
@@ -197,6 +199,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   Ignore Age Gap (Allow any 16+ mix)
                 </label>
               </div>
+              <p className="text-[10px] text-slate-500 leading-tight">
+                <strong>13-15</strong> year olds can be manually bumped up to Adult.
+              </p>
             </div>
           </section>
         </div>

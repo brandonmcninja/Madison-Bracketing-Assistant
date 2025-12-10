@@ -75,11 +75,11 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 size={16} className="text-green-500 mt-0.5" />
-                  <span><strong>Kids (&lt;16):</strong> Strict divisions (8U, 9-12) and 10% weight spread.</span>
+                  <span><strong>Kids (&lt;16):</strong> Strict divisions (8U, 9-12 Coed, 13-15 Separated) and 10% weight spread.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 size={16} className="text-green-500 mt-0.5" />
-                  <span><strong>Adults (16+):</strong> Age gaps can be ignored. Ultra Heavy (225+) toggle ignores weight limits.</span>
+                  <span><strong>Adults (16+):</strong> Age gaps can be ignored. Teens (13-15) can bump up. Ultra Heavy (225+) toggle ignores weight limits.</span>
                 </li>
               </ul>
             </div>
